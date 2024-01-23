@@ -131,10 +131,14 @@ class Trainer(ABC):
         self.train_epoch_costs: list[float] = []
         self.train_eval_results: dict[str, list[Any]] = {}
         self._train_eval_running: dict[str, list[tuple[int, Any]]] = {}
+        self.train_probabilities: list[list[list[float]]] = []
+        self.train_predictions: list[list[int]] = []
 
         self.val_costs: list[float] = []
         self.val_eval_results: dict[str, list[Any]] = {}
         self._val_eval_running: dict[str, list[tuple[int, Any]]] = {}
+        self.val_probabilities: list[list[list[float]]] = []
+        self.val_predictions: list[list[int]] = []
 
         if self.evaluate_functions is not None:
             for name in self.evaluate_functions:
@@ -341,13 +345,17 @@ class Trainer(ABC):
                        batch: tuple[list[Any], Any],
                        step_func: Callable,
                        losses: list[tuple[int, Any]],
+                       probabilities: list[list[float, float]],
+                       predictions: list[int],
                        eval_results: dict[str, list[Any]],
                        evaluate: bool = True) -> Any:
         """Perform a forward step and evaluate the metrics."""
         batch_size = len(batch[0])
         y_hat, loss = step_func(batch)
         losses.append((batch_size, loss))
-
+        for i in range(batch_size):
+            probabilities.append(y_hat[i,:].tolist())
+            predictions.append(int(torch.argmax(y_hat[i,:])))
         if self.evaluate_functions is not None and evaluate:
             for metr, func in self.evaluate_functions.items():
                 res = func(y_hat, batch[1])
@@ -454,6 +462,8 @@ class Trainer(ABC):
                                 position=1):
 
                 train_losses: list[tuple[int, Any]] = []
+                train_probabilities_epoch: list[list[float, float]] = []
+                train_predictions_epoch: list[int] = []
                 for batch in tqdm(train_dataset,
                                   desc='Batch',
                                   total=train_dataset.batches_per_epoch,
@@ -466,6 +476,8 @@ class Trainer(ABC):
                         batch,
                         self.training_step,
                         train_losses,
+                        train_probabilities_epoch,
+                        train_predictions_epoch,
                         self._train_eval_running,
                         self.evaluate_on_train
                     )
@@ -490,6 +502,8 @@ class Trainer(ABC):
                     # evaluate metrics on validation data
                     if val_dataset is not None and step % evaluation_step == 0:
                         val_loss: list[tuple[int, Any]] = []
+                        val_probabilities_epoch: list[list[float, float]] = []
+                        val_predictions_epoch: list[int] = []
                         for v_batch in tqdm(val_dataset,
                                             desc='Validation batch',
                                             total=batches_per_validation,
@@ -501,6 +515,8 @@ class Trainer(ABC):
                                 v_batch,
                                 self.validation_step,
                                 val_loss,
+                                val_probabilities_epoch,
+                                val_predictions_epoch,
                                 self._val_eval_running
                             )
 
@@ -578,6 +594,18 @@ class Trainer(ABC):
                 # calculate epoch loss
                 self.train_epoch_costs.append(
                     self._get_weighted_mean(train_losses))
+                self.train_probabilities.append(
+                    train_probabilities_epoch
+                )
+                self.val_probabilities.append(
+                    val_probabilities_epoch
+                )
+                self.train_predictions.append(
+                    train_predictions_epoch
+                )
+                self.val_predictions.append(
+                    val_predictions_epoch
+                )            
                 self._to_tensorboard('train/epoch_loss',
                                      self.train_epoch_costs[-1],
                                      epoch)

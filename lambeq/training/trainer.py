@@ -35,6 +35,7 @@ import sys
 from typing import Any, Callable, TYPE_CHECKING
 
 from tqdm.auto import tqdm, trange
+import torch 
 
 if TYPE_CHECKING:
     from torch.utils.tensorboard.writer import SummaryWriter

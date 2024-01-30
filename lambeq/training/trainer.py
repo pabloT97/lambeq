@@ -35,6 +35,7 @@ import sys
 from typing import Any, Callable, TYPE_CHECKING
 
 from tqdm.auto import tqdm, trange
+# (Pablo) Add torch import
 import torch 
 
 if TYPE_CHECKING:
@@ -132,12 +133,14 @@ class Trainer(ABC):
         self.train_epoch_costs: list[float] = []
         self.train_eval_results: dict[str, list[Any]] = {}
         self._train_eval_running: dict[str, list[tuple[int, Any]]] = {}
+        # (Pablo) Add lists for storing train probs and preds
         self.train_probabilities: list[list[list[float]]] = []
         self.train_predictions: list[list[int]] = []
 
         self.val_costs: list[float] = []
         self.val_eval_results: dict[str, list[Any]] = {}
         self._val_eval_running: dict[str, list[tuple[int, Any]]] = {}
+        # (Pablo) Add lists for storing val probs and preds 
         self.val_probabilities: list[list[list[float]]] = []
         self.val_predictions: list[list[int]] = []
 
@@ -341,7 +344,7 @@ class Trainer(ABC):
             total += batch_size * metric
             batches += batch_size
         return total / batches
-
+    # (Pablo) Add probabilities and predictions as inputs of the function
     def _step_and_eval(self,
                        batch: tuple[list[Any], Any],
                        step_func: Callable,
@@ -354,6 +357,7 @@ class Trainer(ABC):
         batch_size = len(batch[0])
         y_hat, loss = step_func(batch)
         losses.append((batch_size, loss))
+        # (Pablo) Computes probs and preds
         for i in range(batch_size):
             probabilities.append(y_hat[i,:].tolist())
             predictions.append(int(torch.argmax(y_hat[i,:])))
@@ -463,6 +467,7 @@ class Trainer(ABC):
                                 position=1):
 
                 train_losses: list[tuple[int, Any]] = []
+                # (Pablo) Add lists for computing probs and preds of a given epoch
                 train_probabilities_epoch: list[list[float, float]] = []
                 train_predictions_epoch: list[int] = []
                 for batch in tqdm(train_dataset,
@@ -501,6 +506,7 @@ class Trainer(ABC):
                                                mode='train')
 
                     # evaluate metrics on validation data
+                    # (Pablo) Add lists for storing probs and preds val epoch
                     if val_dataset is not None and step % evaluation_step == 0:
                         val_loss: list[tuple[int, Any]] = []
                         val_probabilities_epoch: list[list[float, float]] = []
@@ -595,6 +601,7 @@ class Trainer(ABC):
                 # calculate epoch loss
                 self.train_epoch_costs.append(
                     self._get_weighted_mean(train_losses))
+                # (Pablo) Add attribute to the class with the computed probs and preds
                 self.train_probabilities.append(
                     train_probabilities_epoch
                 )
